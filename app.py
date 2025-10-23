@@ -206,10 +206,13 @@ if not st.session_state["sending"]:
         if not pending_rows.empty:
             df = pending_rows.reset_index(drop=True)
 
-        st.dataframe(df.head())
+        # Editable recipient list
         st.info("📌 Include 'ThreadId' and 'RfcMessageId' columns for follow-ups if needed.")
         df = st.data_editor(df, num_rows="dynamic", use_container_width=True)
 
+        # ---------------------------
+        # Template Editor
+        # ---------------------------
         subject_template = st.text_input("Subject", "Hello {Name}")
         body_template = st.text_area(
             "Body",
@@ -225,6 +228,26 @@ Thanks,
         delay = st.slider("Delay (seconds)", 20, 75, 20)
         send_mode = st.radio("Choose mode", ["🆕 New Email", "↩️ Follow-up (Reply)", "💾 Save as Draft"])
 
+        # ---------------------------
+        # Gmail Template Preview (Below Editor)
+        # ---------------------------
+        if not df.empty:
+            preview_row = df.iloc[0]  # Preview using first row
+            try:
+                preview_subject = subject_template.format(**preview_row)
+                preview_body = convert_bold(body_template.format(**preview_row))
+            except Exception as e:
+                preview_subject = subject_template
+                preview_body = body_template
+                st.warning(f"⚠️ Could not render preview: {e}")
+
+            st.markdown("### 👀 Preview (First Row)")
+            st.markdown(f"**Subject:** {preview_subject}")
+            st.markdown(preview_body, unsafe_allow_html=True)
+
+        # ---------------------------
+        # Send Button
+        # ---------------------------
         if st.button("🚀 Send Emails / Save Drafts"):
             st.session_state.update({
                 "sending": True,
@@ -262,7 +285,7 @@ if st.session_state["sending"]:
     batch_count = 0
     for idx, row in df.iterrows():
         if send_mode != "💾 Save as Draft" and batch_count >= BATCH_SIZE_DEFAULT:
-            break  # Stop after 50 messages
+            break
         if row.get("Status") == "Sent":
             continue
 
